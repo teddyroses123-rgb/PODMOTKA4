@@ -19,6 +19,7 @@ export const saveContentToDatabase = async (content: SiteContent): Promise<boole
     const response = await fetch(`${supabaseUrl}/functions/v1/save-content`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${supabaseAnonKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
