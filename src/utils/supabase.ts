@@ -3,6 +3,7 @@ import { SiteContent } from '../types/content';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const adminSecret = import.meta.env.VITE_ADMIN_SECRET;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Supabase environment variables not found');
@@ -14,20 +15,32 @@ export const saveContentToDatabase = async (content: SiteContent): Promise<boole
   try {
     console.log('🔄 ПОПЫТКА СОХРАНЕНИЯ В БД...');
     
-    const { data, error } = await supabase
-      .from('site_content')
-      .upsert({
-        id: 'main',
+    // Используем Edge Function для сохранения с правильными правами доступа
+    const response = await fetch(`${supabaseUrl}/functions/v1/save-content`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         content: content,
-        updated_at: new Date().toISOString()
-      });
+        adminSecret: adminSecret || 'podmotka1122_admin_secret'
+      })
+    });
 
-    if (error) {
-      console.error('❌ ОШИБКА СОХРАНЕНИЯ В БД:', error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ ОШИБКА СОХРАНЕНИЯ В БД:', errorText);
       return false;
     }
 
-    console.log('✅ КОНТЕНТ УСПЕШНО СОХРАНЕН В БАЗУ ДАННЫХ!', data);
+    const result = await response.json();
+    if (result.success) {
+      console.log('✅ КОНТЕНТ УСПЕШНО СОХРАНЕН В БАЗУ ДАННЫХ!');
+    } else {
+      console.error('❌ ОШИБКА СОХРАНЕНИЯ В БД:', result.error);
+      return false;
+    }
+
     return true;
   } catch (error) {
     console.error('❌ КРИТИЧЕСКАЯ ОШИБКА СОХРАНЕНИЯ В БД:', error);
