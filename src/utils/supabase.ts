@@ -15,6 +15,12 @@ export const saveContentToDatabase = async (content: SiteContent): Promise<boole
   try {
     console.log('🔄 ПОПЫТКА СОХРАНЕНИЯ В БД...');
     
+    // Check if Supabase URL is available
+    if (!supabaseUrl) {
+      console.error('❌ SUPABASE_URL не найден в переменных окружения');
+      return false;
+    }
+
     // Используем Edge Function для сохранения с правильными правами доступа
     const response = await fetch(`${supabaseUrl}/functions/v1/save-content`, {
       method: 'POST',
