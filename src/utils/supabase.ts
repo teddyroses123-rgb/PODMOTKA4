@@ -59,24 +59,30 @@ export const loadContentFromDatabase = async (): Promise<SiteContent | null> => 
   try {
     console.log('🔄 ЗАГРУЗКА ИЗ БД...');
     
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('site_content')
       .select('content')
-      .eq('id', 'main')
-      .single();
+      .eq('id', 'main');
 
     if (error) {
-      console.error('❌ ОШИБКА ЗАГРУЗКИ ИЗ БД:', error);
+      // Если ошибка не связана с отсутствием записей, выбрасываем её
+      if (error.code !== 'PGRST116') {
+        console.error('❌ ОШИБКА ЗАГРУЗКИ ИЗ БД:', error.message);
+        throw new Error(error.message);
+      }
+      // Если записей нет (PGRST116), возвращаем null
+      console.log('ℹ️ Записей в БД нет, возвращаем null');
       return null;
     }
 
-    if (data && data.content) {
+    // Проверяем есть ли данные
+    if (!data || data.length === 0 || !data[0]?.content) {
       console.log('✅ КОНТЕНТ УСПЕШНО ЗАГРУЖЕН ИЗ БД');
       return data.content as SiteContent;
     }
 
-    console.log('⚠️ НЕТ ДАННЫХ В БД');
-    return null;
+    console.log('✅ Контент загружен из БД');
+    return data[0].content as SiteContent;
   } catch (error) {
     console.error('❌ КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ ИЗ БД:', error);
     return null;
