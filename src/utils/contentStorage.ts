@@ -12,6 +12,10 @@ export const saveContent = async (content: SiteContent, immediate: boolean = fal
   try {
     console.log('💾 НАЧИНАЕМ СОХРАНЕНИЕ...');
     
+    // ВСЕГДА сначала сохраняем в localStorage как бекап
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+    console.log('💾 Бекап сохранен в localStorage');
+    
     if (immediate) {
       // Немедленное сохранение
       console.log('🚀 НЕМЕДЛЕННОЕ сохранение в БД...');
@@ -19,15 +23,11 @@ export const saveContent = async (content: SiteContent, immediate: boolean = fal
       
       if (dbSaved) {
         console.log('✅ УСПЕШНО сохранено в БД');
-        // Обновляем бекап только после успешного сохранения в БД
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-        console.log('💾 Бекап обновлен в localStorage');
+        console.log('💾 Данные синхронизированы с БД');
         window.dispatchEvent(new CustomEvent('contentSaved', { detail: { success: true } }));
       } else {
-        console.log('❌ ОШИБКА сохранения в БД - сохраняем только в localStorage');
-        // БД недоступна, но сохраняем в localStorage чтобы не потерять изменения
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-        console.log('🆘 Изменения сохранены в localStorage (БД недоступна)');
+        console.log('❌ ОШИБКА сохранения в БД - данные остаются в localStorage');
+        console.log('🆘 Изменения НЕ ПОТЕРЯНЫ - сохранены локально');
         window.dispatchEvent(new CustomEvent('contentSaved', { detail: { success: false, savedToLocal: true } }));
       }
     } else {
@@ -42,15 +42,11 @@ export const saveContent = async (content: SiteContent, immediate: boolean = fal
         
         if (dbSaved) {
           console.log('✅ УСПЕШНО сохранено в БД (отложенно)');
-          // Обновляем бекап только после успешного сохранения в БД
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-          console.log('💾 Бекап обновлен в localStorage');
+          console.log('💾 Данные синхронизированы с БД');
           window.dispatchEvent(new CustomEvent('contentSaved', { detail: { success: true } }));
         } else {
-          console.log('❌ ОШИБКА отложенного сохранения в БД - сохраняем только в localStorage');
-          // БД недоступна, но сохраняем в localStorage чтобы не потерять изменения
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-          console.log('🆘 Изменения сохранены в localStorage (БД недоступна)');
+          console.log('❌ ОШИБКА отложенного сохранения в БД - данные остаются в localStorage');
+          console.log('🆘 Изменения НЕ ПОТЕРЯНЫ - сохранены локально');
           window.dispatchEvent(new CustomEvent('contentSaved', { detail: { success: false, savedToLocal: true } }));
         }
       }, SAVE_DELAY);
@@ -58,10 +54,10 @@ export const saveContent = async (content: SiteContent, immediate: boolean = fal
     
   } catch (error) {
     console.error('❌ КРИТИЧЕСКАЯ ОШИБКА в saveContent:', error);
-    // В случае критической ошибки сохраняем в localStorage
+    // В случае критической ошибки убеждаемся что данные в localStorage
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-      console.log('🆘 КРИТИЧЕСКИЙ бекап в localStorage');
+      console.log('🆘 КРИТИЧЕСКИЙ бекап обновлен в localStorage');
       window.dispatchEvent(new CustomEvent('contentSaved', { detail: { success: false, savedToLocal: true, error: error.message } }));
     } catch (localError) {
       console.error('🆘 КРИТИЧЕСКАЯ ОШИБКА: Не удалось сохранить даже в localStorage:', localError);
@@ -88,7 +84,7 @@ export const loadContent = async (): Promise<SiteContent> => {
       return fixedContent;
     }
     
-    // БД доступна, но пуста (нет записей) ИЛИ БД недоступна
+    // БД пуста или недоступна - НЕ УДАЛЯЕМ данные, проверяем localStorage
     console.log('⚠️ БД пуста или недоступна - проверяем localStorage...');
     
     // Проверяем localStorage
@@ -97,11 +93,12 @@ export const loadContent = async (): Promise<SiteContent> => {
       try {
         const content = JSON.parse(backupContent);
         console.log('💾 ДАННЫЕ ЗАГРУЖЕНЫ ИЗ localStorage (бекап)');
+        console.log('ℹ️ БД недоступна, используем локальные данные');
         return fixBlockOrder(content);
       } catch (parseError) {
         console.error('❌ Ошибка парсинга бекапа из localStorage:', parseError);
-        // Удаляем поврежденный бекап
-        localStorage.removeItem(STORAGE_KEY);
+        // НЕ удаляем поврежденный бекап сразу, сначала попробуем дефолт
+        console.log('⚠️ Поврежденный бекап, используем дефолтный контент');
       }
     }
     
@@ -109,8 +106,8 @@ export const loadContent = async (): Promise<SiteContent> => {
     console.log('📦 НЕТ ДАННЫХ НИГДЕ - используем дефолтный контент');
     const defaultFixedContent = fixBlockOrder(defaultContent);
     
-    // ❌ НЕ СОХРАНЯЕМ дефолт автоматически!
-    // Пользователь должен сам сохранить, если захочет
+    // НЕ СОХРАНЯЕМ дефолт автоматически - пользователь сам решает
+    console.log('ℹ️ Дефолтный контент загружен, сохранение - по желанию пользователя');
     
     return defaultFixedContent;
     
